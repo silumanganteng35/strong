@@ -35,11 +35,15 @@ if (themeToggleBtn) {
 }
 
 // ===== APPLY CONTENT FROM ADMIN PANEL =====
-function applyContent() {
-  const raw = localStorage.getItem('joglo-content');
-  if (!raw) return;
+function applyContent(overrideData) {
   let d;
-  try { d = JSON.parse(raw); } catch { return; }
+  if (overrideData) {
+    d = overrideData;
+  } else {
+    const raw = localStorage.getItem('joglo-content');
+    if (!raw) return;
+    try { d = JSON.parse(raw); } catch { return; }
+  }
 
   // Helper: safe set text
   const setText = (sel, val) => {
@@ -301,8 +305,29 @@ function applyContent() {
   }
 }
 
+// Inisialisasi konten: localStorage → content.json → HTML default
+async function initContent() {
+  const raw = localStorage.getItem('joglo-content');
+  if (raw) {
+    // Ada data di localStorage (pengunjung lama / admin sudah setting)
+    applyContent();
+  } else {
+    // Coba load dari content.json (data baked-in untuk GitHub Pages)
+    try {
+      const resp = await fetch('./content.json');
+      if (resp.ok) {
+        const json = await resp.json();
+        localStorage.setItem('joglo-content', JSON.stringify(json));
+        applyContent(json);
+      }
+    } catch (e) {
+      // content.json tidak ada, tampilkan HTML default
+    }
+  }
+}
+
 // Run on page load
-document.addEventListener('DOMContentLoaded', applyContent);
+document.addEventListener('DOMContentLoaded', initContent);
 
 // Auto-apply when admin saves (cross-tab live update via storage event)
 window.addEventListener('storage', (e) => {
