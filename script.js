@@ -234,8 +234,24 @@ function applyContent() {
       card.setAttribute('data-title', v.judul);
       const img = card.querySelector('.video-thumb');
       if (img && v.yt_id) {
-        img.src = `https://img.youtube.com/vi/${v.yt_id}/maxresdefault.jpg`;
-        img.onerror = function() { this.src = `https://img.youtube.com/vi/${v.yt_id}/hqdefault.jpg`; };
+        // Fallback lokal berdasarkan index kartu
+        const localFallbacks = [
+          'images/printing_process.png',
+          'images/printing_process.png',
+          'images/product_showcase.png',
+          'images/custom_tshirt_designs.jpeg'
+        ];
+        const localFallback = localFallbacks[i] || 'images/product_showcase.png';
+
+        img.src = `https://img.youtube.com/vi/${v.yt_id}/hqdefault.jpg`;
+        img.onerror = function() {
+          this.onerror = function() {
+            // Final fallback ke gambar lokal
+            this.onerror = null;
+            this.src = localFallback;
+          };
+          this.src = `https://img.youtube.com/vi/${v.yt_id}/mqdefault.jpg`;
+        };
         img.alt = v.judul;
       }
       const label = card.querySelector('.video-duration');
@@ -566,7 +582,7 @@ window.addEventListener('scroll', () => {
 (function() {
   const modal    = document.getElementById('video-modal');
   const iframe   = document.getElementById('video-modal-iframe');
-  const title    = document.getElementById('video-modal-title');
+  const titleEl  = document.getElementById('video-modal-title');
   const closeBtn = document.getElementById('video-modal-close');
   const backdrop = document.getElementById('video-modal-backdrop');
   const fallback = document.getElementById('video-modal-fallback');
@@ -574,32 +590,61 @@ window.addEventListener('scroll', () => {
 
   if (!modal) return;
 
-  let fallbackTimer = null;
+  // Deteksi apakah dibuka dari file:// (lokal)
+  const isLocalFile = location.protocol === 'file:';
 
   function extractYtId(url) {
-    const m = url.match(/embed\/([^?&]+)/);
+    const m = (url || '').match(/embed\/([^?&]+)/);
     return m ? m[1] : null;
   }
 
-  // Click any video card → buka YouTube langsung di tab baru
+  function openModal(videoUrl, videoTitle) {
+    const ytId = extractYtId(videoUrl);
+    if (titleEl) titleEl.textContent = videoTitle || 'Video';
+    if (ytLink && ytId) ytLink.href = 'https://www.youtube.com/watch?v=' + ytId;
+
+    if (isLocalFile || !ytId) {
+      // File lokal: langsung tampilkan panel fallback dalam modal
+      iframe.style.display = 'none';
+      if (fallback) fallback.style.display = 'flex';
+    } else {
+      // Server/hosting: embed YouTube iframe normal
+      iframe.src = videoUrl.replace('youtube.com/embed', 'youtube-nocookie.com/embed');
+      iframe.style.display = 'block';
+      if (fallback) fallback.style.display = 'none';
+    }
+
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    modal.classList.remove('open');
+    document.body.style.overflow = '';
+    setTimeout(() => {
+      iframe.src = '';
+      iframe.style.display = 'block';
+      if (fallback) fallback.style.display = 'none';
+    }, 350);
+  }
+
   document.querySelectorAll('.video-card').forEach(card => {
     card.addEventListener('click', () => {
       const url = card.getAttribute('data-video');
-      const ytId = extractYtId(url || '');
-      if (ytId) {
-        window.open('https://www.youtube.com/watch?v=' + ytId, '_blank', 'noopener');
-      } else if (url) {
-        window.open(url, '_blank', 'noopener');
-      }
+      const t   = card.getAttribute('data-title');
+      if (url) openModal(url, t);
     });
     card.setAttribute('tabindex', '0');
     card.setAttribute('role', 'button');
     card.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        card.click();
-      }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.click(); }
     });
+  });
+
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  if (backdrop) backdrop.addEventListener('click', closeModal);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
   });
 })();
 

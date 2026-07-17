@@ -1686,6 +1686,15 @@ ul { list-style: none; }
   height: 100%;
   object-fit: cover;
   transition: transform 0.5s ease;
+  /* Jika gambar gagal load, tetap tampilkan area gelap */
+  background: #1a1a1a;
+  min-height: 160px;
+}
+
+/* Placeholder saat thumbnail gagal */
+.video-thumb[src=""],
+.video-thumb:not([src]) {
+  visibility: hidden;
 }
 
 .video-card:hover .video-thumb {
